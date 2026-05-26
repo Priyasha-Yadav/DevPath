@@ -18,6 +18,14 @@ SCORING_WEIGHTS = {
 }
 
 
+VALID_LEVELS = {"beginner", "intermediate", "advanced"}
+VALID_INTERESTS = {
+    "web", "data", "education", "automation", "games",
+    "cybersecurity", "devops", "mobile", "machine learning/ai",
+    "artificial intelligence", "cloud computing", "mobile app development"
+}
+VALID_TIMES = {"low", "medium", "high"}
+
 # Common aliases and abbreviations for skills
 # This improves recommendation accuracy by normalizing user input
 SKILL_ALIASES = {
@@ -138,16 +146,17 @@ def validate_recommendation_inputs(skills, level, interest, time_availability):
     """
     errors = []
 
-    if not skills or not skills.strip():
-        errors.append("Please enter at least one skill.")
+    parsed_skills = parse_skills(skills) if isinstance(skills, str) else []
+    if not parsed_skills:
+        errors.append("Please enter at least one valid skill.")
 
-    if not level or not level.strip():
-        errors.append("Please select an experience level.")
+    if not level or not isinstance(level, str) or level.strip().lower() not in VALID_LEVELS:
+        errors.append("Please select a valid experience level.")
 
-    if not interest or not interest.strip():
-        errors.append("Please select an area of interest.")
+    if not interest or not isinstance(interest, str) or interest.strip().lower() not in VALID_INTERESTS:
+        errors.append("Please select a valid area of interest.")
 
-    if not time_availability or not time_availability.strip():
-        errors.append("Please select your time availability.")
+    if not time_availability or not isinstance(time_availability, str) or time_availability.strip().lower() not in VALID_TIMES:
+        errors.append("Please select a valid time availability.")
 
     return errors

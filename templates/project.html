@@ -476,7 +476,7 @@
   <!-- Pass project metadata to the JavaScript without hardcoding -->
   <script>
     var PROJECT_ID = parseInt("{{ project.id }}", 10);
-    var PROJECT_TITLE = "{{ project.title | escapejs }}";
+    var PROJECT_TITLE = {{ project.title | tojson }};
   </script>
   <script src="/static/script.js"></script>
 </body>

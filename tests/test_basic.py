@@ -18,7 +18,7 @@ import pytest
 # Allow imports from the project root when running tests directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.data_loader import load_all_projects, find_project_by_id, clear_cache
+from utils.data_loader import load_all_projects, find_project_by_id, clear_cache, validate_projects
 from utils.recommender import (
     get_recommendations,
     validate_recommendation_inputs,
@@ -50,6 +50,107 @@ def test_projects_json_loads():
     assert isinstance(projects, list), "Expected a list of projects"
     assert len(projects) > 0, "Project list must not be empty"
 
+def test_duplicate_ids_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "Project A",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        },
+        {
+            "id": 1,
+            "title": "Project B",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
+
+def test_duplicate_titles_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "AI Resume Builder",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        },
+        {
+            "id": 2,
+            "title": "ai resume builder",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
+
+def test_empty_title_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
+
+def test_missing_required_field_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "Project A"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
 
 def test_each_project_has_required_fields():
     """Every project must have the fields the UI depends on."""
@@ -242,6 +343,20 @@ def test_get_recommendations_result_format():
         assert "title" in project
 
 
+def test_case_insensitive_recommendations_identical():
+    """Lowercase and titlecase skill inputs must produce identical recommendations."""
+    results_lower = get_recommendations("python", "Beginner", "Data", "Low")
+    results_title = get_recommendations("Python", "Beginner", "Data", "Low")
+    assert [p["id"] for p in results_lower] == [p["id"] for p in results_title]
+
+
+def test_whitespace_stripped_in_skills():
+    """Leading/trailing whitespace in the skills string must be ignored."""
+    results_clean = get_recommendations("python", "Beginner", "Data", "Low")
+    results_spaced = get_recommendations("   python  ", "Beginner", "Data", "Low")
+    assert [p["id"] for p in results_clean] == [p["id"] for p in results_spaced]
+
+
 # ============================================================
 # Input validation tests
 # ============================================================
@@ -354,6 +469,34 @@ def test_recommend_api_missing_field():
     assert "error" in response.get_json()
 
 
+def test_recommend_api_null_field():
+    """The API should return 400 when a field is explicitly set to null."""
+    client = get_client()
+    response = client.post("/api/recommend", json={
+        "skills": None,
+        "level": "Beginner",
+        "interest": "Web",
+        "time": "Low"
+    })
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+
+
+def test_recommend_api_non_string_field():
+    """The API should return 400 when a field is a non-string type (e.g. a list)."""
+    client = get_client()
+    response = client.post("/api/recommend", json={
+        "skills": ["Python", "HTML"],
+        "level": "Beginner",
+        "interest": "Web",
+        "time": "Low"
+    })
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+
+
 def test_recommend_api_empty_body():
     """The API should return 400 when the body is not valid JSON."""
     client = get_client()
@@ -399,6 +542,31 @@ def test_download_code_found():
     client = get_client()
     response = client.get("/project/1/download")
     assert response.status_code == 200
+
+
+def test_view_code_nested_path():
+    """Project 9 has a nested starter_code path; /code should still return 200."""
+    client = get_client()
+    response = client.get("/project/9/code")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "code" in data
+    assert "filename" in data
+    assert len(data["code"]) > 0
+
+
+def test_download_code_nested_path():
+    """Project 9 has a nested starter_code path; /download should still return 200."""
+    client = get_client()
+    response = client.get("/project/9/download")
+    assert response.status_code == 200
+
+
+def test_resolve_starter_file_path_traversal():
+    """resolve_starter_file must return None for path traversal attempts."""
+    from utils.file_server import resolve_starter_file
+    malicious = {"starter_code": "starter_code/../../routes/main_routes.py"}
+    assert resolve_starter_file(malicious) is None
     
 def test_health_check():
     client = get_client()

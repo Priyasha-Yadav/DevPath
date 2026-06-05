@@ -31,7 +31,7 @@ SKILL_ALIASES = {
     "html5": "html",
     "css3": "css",
     "c++": "cpp",
-    "web dev": "javascript"
+    "web dev": ["javascript", "html", "css"]
 }
 
 
@@ -50,10 +50,13 @@ def parse_skills(skills_string):
         if s.strip()
     ]
 
-    normalized_skills = [
-        SKILL_ALIASES.get(skill, skill)
-        for skill in raw_skills
-    ]
+    normalized_skills = []
+    for skill in raw_skills:
+        alias = SKILL_ALIASES.get(skill, skill)
+        if isinstance(alias, list):
+            normalized_skills.extend(alias)
+        else:
+            normalized_skills.append(alias)
 
     return normalized_skills
 
@@ -143,23 +146,29 @@ def get_recommendations(skills_string, level, interest, time_availability):
     return [item["project"] for item in scored_projects[:MAX_RESULTS]]
 
 
+VALID_LEVELS = ["beginner", "intermediate", "advanced"]
+VALID_TIME_AVAILABILITY = ["low", "medium", "high"]
+
+
 def validate_recommendation_inputs(skills, level, interest, time_availability):
-    """
-    Validate all four required fields.
-    Returns a list of error strings. An empty list means all inputs are valid.
-    """
     errors = []
 
     if not skills or not skills.strip():
         errors.append("Please enter at least one skill.")
+    elif not parse_skills(skills):
+        errors.append("Please enter at least one valid skill.")
 
     if not level or not level.strip():
         errors.append("Please select an experience level.")
+    elif level.strip().lower() not in VALID_LEVELS:
+        errors.append("Invalid experience level. Choose Beginner, Intermediate, or Advanced.")
 
     if not interest or not interest.strip():
         errors.append("Please select an area of interest.")
 
     if not time_availability or not time_availability.strip():
         errors.append("Please select your time availability.")
+    elif time_availability.strip().lower() not in VALID_TIME_AVAILABILITY:
+        errors.append("Invalid time availability. Choose Low, Medium, or High.")
 
     return errors

@@ -36,6 +36,10 @@ def index():
 
     return render_template("index.html", stats=stats, available_levels=available_levels, config=Config)
 
+@main.route("/contact")
+def contact():
+    return render_template("contact.html")
+
 @main.route("/health")
 def health_check():
     """

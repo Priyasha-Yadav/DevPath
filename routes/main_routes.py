@@ -136,6 +136,34 @@ def recommend():
 
     return jsonify({"projects": results}), 200
 
+@main.route("/api/project/<int:project_id>/resources")
+def project_resources(project_id):
+    """Return the validated resource list for a project.
+
+    Each resource is parsed from its raw "Label: URL" string format and
+    returned as a structured object so the frontend can render broken
+    links differently from valid ones.
+
+    Response shape:
+        {
+            "project_id": 1,
+            "resources": [
+                {"label": "Python official docs", "url": "https://docs.python.org", "valid": true},
+                {"label": "Broken link", "url": "not-a-url", "valid": false}
+            ]
+        }
+    """
+    from utils.url_validator import validate_resources
+
+    project = find_project_by_id(project_id)
+    if not project:
+        return jsonify({"error": "Project not found."}), 404
+
+    validated = validate_resources(project.get("resources", []))
+    return jsonify({
+        "project_id": project_id,
+        "resources": validated
+    }), 200
 
 @main.route("/project/<int:project_id>")
 def project_detail(project_id):

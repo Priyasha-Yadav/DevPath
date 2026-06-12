@@ -17,7 +17,10 @@ from errors.handlers import register_error_handlers
 
 app = Flask(__name__)
 
-# Register all routes defined in the main Blueprint
+# Load config settings into Flask's internal config manager properly
+app.config.from_object(Config)
+
+# Register all routes defined in the main Blueprint (This handles your '/' route!)
 app.register_blueprint(main)
 
 # Register the global error boundary (handles 400, 403, 404, 405, 429, 500,
@@ -47,6 +50,7 @@ def internal_server_error(error):
 
 
 if __name__ == "__main__":
+
     import os
     debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() in ("true", "1")
     app.run(

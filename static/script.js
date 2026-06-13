@@ -194,9 +194,48 @@ function recordSearch() {
 
   function normalizeSkill(skill) { return skill.trim().toLowerCase(); }
 
-  function isSkillSelected(skill) {
-    var normalizedSkill = normalizeSkill(skill);
-    return selectedSkills.some(function (s) { return normalizeSkill(s) === normalizedSkill; });
+loadProgressState();
+updateProfileWidgets();
+
+(function initIndexPage() {
+  var form = document.getElementById("recommend-form");
+  if (!form) return;
+
+  var submitBtn = document.getElementById("submit-btn");
+  var btnLabel = document.getElementById("btn-label");
+  var btnLoading = document.getElementById("btn-loading");
+  var resultsSection = document.getElementById("results-section");
+  var resultsGrid = document.getElementById("results-grid");
+  var resultsLoadingEl = document.getElementById("results-loading");
+  var resultsEmptyEl = document.getElementById("results-empty");
+  var emptyMessageEl = document.getElementById("empty-message");
+  var skillsHidden = document.getElementById("skills");
+  var skillsInput = document.getElementById("skills-input");
+  var selectedChips = document.getElementById("skill-chips-selected");
+  var suggestions = document.getElementById("skills-suggestions");
+  var skillWrap = document.getElementById("skill-input-wrap");
+  var quickPickChips = Array.prototype.slice.call(document.querySelectorAll(".skill-chip"));
+  var selectedSkills = [];
+  var availableSkills = (typeof skills !== "undefined" && Array.isArray(skills))
+    ? skills.map(function (item) { return item.label; }).filter(Boolean)
+    : quickPickChips.map(function (chip) { return chip.getAttribute("data-skill"); });
+  var activeSuggestionIndex = -1;
+  var visibleSuggestions = [];
+  var SAVED_PROJECTS_KEY = "devpathSavedProjects";
+
+  window.addSkill = function addSkill(rawSkill) {
+    var skill = canonicalSkill(rawSkill);
+    if (!skill || isSelected(skill)) return;
+    selectedSkills.push(skill);
+    renderSelectedChips();
+    syncSkillsHiddenInput();
+    updateQuickPickState();
+    clearFieldError("skills-error");
+    if (skillsInput) skillsInput.focus();
+  };
+
+  function normalize(value) {
+    return String(value || "").trim().toLowerCase();
   }
 
   function getCanonicalSkill(rawSkill) {
@@ -327,20 +366,6 @@ function recordSearch() {
     if (skillWrap && !skillWrap.contains(evt.target)) hideSuggestions();
   });
 
-  //add a skill to the list if it's not empty or a duplicate
-  function addSkill(rawSkill) {
-    var skill = getCanonicalSkill(rawSkill);
-    if (!skill) return;
-    if (isSkillSelected(skill)) return;
-    selectedSkills.push(skill);
-    renderSelectedChips();
-    syncSkillsHiddenInput();
-    updateQuickPickState();
-    // Once a skill is added, remove the "please add a skill" error if it was showing
-    clearFieldError("skills-error");
-  }
-
-  // remove a skill from the list and update the UI accordingly
   function removeSkill(skill) {
     // Rebuild the array without the skill that was just removed
     selectedSkills = selectedSkills.filter(function (s) { return normalizeSkill(s) !== normalizeSkill(skill); });
@@ -690,138 +715,7 @@ function recordSearch() {
   // Form submission and API call
   // ----------------------------------------------------------
 
-  form.addEventListener("submit", function (evt) {
-    evt.preventDefault(); //stop the browser from reloading the page on form submit
-    clearAllErrors()
-    
-    clearAllErrors();
-
-    if (skillsInput.value.trim()) {
-      addSkill(skillsInput.value);
-      skillsInput.value = "";
-      hideSuggestions();
-    }
-
-    if (!validateForm()) return; //stop - anything missing/invalid
-
-    setLoadingState(true);
-
-    // Allow browser to paint spinner before request starts
-    requestAnimationFrame(function () {
-
-      var payload = {
-      //combine form values into an object to send to server/api
-      var payload = {
-        skills: skillsHidden.value.trim() || skillsTextInput.value.trim(),
-        level: document.getElementById("level").value,
-        interest: document.getElementById("interest").value,
-        time: document.getElementById("time").value
-      };
-
-      fetch("/api/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-        .then(function (res) {
-          return res.json();
-        })
-        .then(function (data) {
-          console.log("API Response:", data);
-          setLoadingState(false);
-  evt.preventDefault();
-
-  clearAllErrors();
-
-  if (skillsTextInput.value.trim()) {
-    addSkill(skillsTextInput.value);
-    skillsTextInput.value = "";
-    hideSuggestions();
-  }
-
-  if (!validateForm()) return;
-
-  setLoadingState(true);
-
-          renderResults(data.projects || [], data.message);
-          renderResults(Array.isArray(data.projects) ? data.projects : [], data.message);
-        })
-        .catch(function (err) {
-          setLoadingState(false);
-          var generalErr = document.getElementById("form-error-general");
-          if (generalErr) {
-            generalErr.textContent = "Something went wrong. Please try again.";
-          }
-        });
-        })
-
-    });
-        
-      }; 
-
-  requestAnimationFrame(function () {
-
-    var payload = {
-      skills: skillsHidden.value.trim() || skillsTextInput.value.trim(),
-      level: document.getElementById("level").value,
-      interest: document.getElementById("interest").value,
-      time: document.getElementById("time").value
-    };
-
-    fetch("/api/recommend", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    })
-      .then(function (res) {
-        return res.json();
-      })
-      .then(function (data) {
-
-        setLoadingState(false);
-
-        if (data.error) {
-          var generalErr = document.getElementById("form-error-general");
-          if (generalErr) {
-            generalErr.textContent = "Network error. Please try again.";
-          }
-        });
-    });
-  });
-            generalErr.textContent = "An unexpected error occurred. Please try again.";
-          }
-          console.error("API request failed:", err);
-        });
-    });
-  }); 
-      //post the data to backend api as JSON, then handle the response
-      fetch("/api/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
-          setLoadingState(false);
-          if (data.error) {
-            var generalErr = document.getElementById("form-error-general");
-            if (generalErr) generalErr.textContent = data.error;
-            return;
-          }
-          renderResults(data.projects || [], data.message);
-        })
-        .catch(function (err) {
-          setLoadingState(false);
-          var generalErr = document.getElementById("form-error-general");
-          if (generalErr) generalErr.textContent = "Something went wrong. Please try again.";
-          console.error(err);
-        });
-    });
-  });
-
-
+  // Manages the loading state of the form and results section(whats visible or not)
   function setLoadingState(isLoading) {
     // Disable the button so the user can't accidentally submit twice
     submitBtn.disabled = isLoading;
@@ -885,6 +779,48 @@ function recordSearch() {
     span.className = "project-tag project-tag--" + normalize(type).replace(/[^a-z0-9_-]/g, "-");
     span.textContent = text;
     return span;
+  }
+
+  //takes the array of projects from the api and draws them on the page as cards
+  //if array is empty it shows the "no results" message instead
+  function renderResults(projects, message) {
+    console.log("Rendering results with projects:", projects);
+    console.log("Message:", message);
+    
+    resultsSection.style.display = "block";
+    resultsLoadingEl.style.display = "none";
+    // Clear out any cards from a previous search before showing new ones
+    resultsGrid.innerHTML = "";
+    recordSearch();
+
+    if (!projects || projects.length === 0) {
+      resultsGrid.style.display = "none";
+      resultsEmptyEl.style.display = "block";
+
+      // Show a friendly custom message when the user selected an interest
+      var selectedInterest = document.getElementById("interest")?.value;
+      if (selectedInterest) {
+        emptyMessageEl.textContent = "No projects are currently available for this interest. Please check back later or try a different area.";
+      } else if (message) {
+        emptyMessageEl.textContent = message;
+      } else {
+        emptyMessageEl.textContent = "Try adjusting your skills or choosing a different interest area.";
+      }
+
+  // Clear out previous results before rendering new ones
+  resultsGrid.innerHTML = "";
+
+  // If no projects are returned, show the empty state message
+  if (!projects || projects.length === 0) {
+    resultsGrid.style.display = "none";
+    resultsEmptyEl.style.display = "block";
+
+    projects.forEach(function (project) {
+      resultsGrid.appendChild(buildProjectCard(project));
+    });
+
+    recordSearch();
+    resultsSection.scrollIntoView({ behavior: "smooth" });
   }
 
   function buildProjectCard(project) {
